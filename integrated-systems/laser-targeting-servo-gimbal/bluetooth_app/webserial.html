@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云台上位机 v5.10 · 激光打靶/矩形循迹</title>
+<style>
+  :root {
+    --bg: #0a0e1a; --card: #151b2e; --accent: #00e5ff; --accent2: #b14bff;
+    --ok: #00ff88; --warn: #ffd93d; --err: #ff4d6d; --text: #e8edf5; --muted: #8a94a8;
+    --btn-bg: rgba(0,229,255,0.08); --btn-border: rgba(0,229,255,0.2);
+    --ch1: #00e5ff; --ch2: #ff4d6d; --ch3: #00ff88; --ch4: #ffd93d;
+    --inner: #ff9f43;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 16px 24px; min-width: 920px;
+  }
+  .app { display: flex; gap: 16px; align-items: flex-start; }
+  .left { width: 380px; flex-shrink: 0; }
+  .right { flex: 1; min-width: 0; }
+  h1 { font-size: 17px; margin: 0 0 12px; letter-spacing: 1px; }
+  h1 span { background: linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px;
+    border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 3px 16px rgba(0,0,0,0.3); }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row.wrap { flex-wrap: wrap; }
+  .btn {
+    background: var(--btn-bg); border: 1px solid var(--btn-border);
+    color: var(--text); border-radius: 8px; padding: 8px 12px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: transform .06s, border-color .15s, background .15s; text-align: center; white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.95); }
+  .btn.primary { background: linear-gradient(135deg,var(--accent),var(--accent2)); border: none; color: #061018; }
+  .btn.danger { border-color: var(--err); color: var(--err); }
+  .btn.sm { padding: 5px 8px; font-size: 11px; }
+  .btn.toggle-on { border-color: var(--accent); background: rgba(0,229,255,0.15); }
+  .btn-group { display: flex; gap: 3px; }
+
+  /* 任务控制按钮 */
+  .task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .task-btn { padding: 10px 8px; font-size: 12.5px; line-height: 1.3; }
+  .task-btn.active { border-color: var(--accent); background: rgba(0,229,255,0.18);
+    box-shadow: 0 0 10px rgba(0,229,255,0.35); }
+  .task-btn.inner { border-color: var(--inner); color: var(--inner); }
+  .task-btn.inner.active { background: rgba(255,159,67,0.18);
+    box-shadow: 0 0 10px rgba(255,159,67,0.4); }
+
+  .status { display: flex; align-items: center; gap: 8px 16px; font-size: 13px; flex-wrap: wrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--err);
+    display: inline-block; flex-shrink: 0; box-shadow: 0 0 4px var(--err); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 4px var(--ok); }
+  .port-info { font-size: 11px; color: var(--muted); }
+  select { background: #060a14; border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text); border-radius: 5px; padding: 3px 6px; font-size: 12px; }
+  input[type=range] { accent-color: var(--accent); height: 4px; flex: 1; }
+  .speed-val { font-variant-numeric: tabular-nums; min-width: 56px;
+    text-align: right; color: var(--accent); font-weight: 600; font-size: 13px; }
+  .section { font-size: 11px; color: var(--muted); margin: 0 0 6px 2px;
+    font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .badge { background: rgba(0,229,255,0.12); color: var(--accent);
+    padding: 1px 6px; border-radius: 6px; font-size: 10px; }
+  .hint { font-size: 10px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+
+  /* 追踪面板 */
+  .tg { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 2px 8px; font-size: 12px;
+    font-family: 'Cascadia Code','Fira Code',monospace; }
+  .tg .l { color: var(--muted); }
+  .tg .v { text-align: right; font-weight: 600; }
+  .tg .v.e { color: var(--err); } .tg .v.o { color: var(--ok); }
+  .tg .v.h { color: var(--warn); } .tg .v.c { color: var(--accent); }
+
+  /* PID 曲线 */
+  .chart-wrap { position: relative; }
+  #pidChart { width: 100%; height: 210px; display: block; border-radius: 6px; background: #060a14; }
+  .chart-legend { display: flex; gap: 12px; font-size: 11px; margin-top: 6px; flex-wrap: wrap; }
+  .chart-legend span { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
+  .axis-note { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* 终端 */
+  .term { background: #060a14; border-radius: 8px; padding: 6px; height: 160px;
+    overflow-y: auto; font-family: monospace; font-size: 11px; line-height: 1.5;
+    white-space: pre-wrap; margin-top: 6px; }
+  .term::-webkit-scrollbar { width: 3px; }
+  .term::-webkit-scrollbar-thumb { background: var(--card); border-radius: 2px; }
+  .cmd-row { display: flex; gap: 4px; margin-top: 6px; }
+  .cmd-row input { flex: 1; background: #060a14; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px; padding: 0 10px; color: var(--text); font-family: monospace;
+    font-size: 12px; outline: none; }
+  .cmd-row input:focus { border-color: var(--accent); }
+
+  /* PID 调参 */
+  .axis-block { background: rgba(255,255,255,0.02); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+  .axis-title { font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--accent); }
+  .axis-title.tilt { color: var(--ch2); }
+  .tune-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .tune-row .lab { width: 26px; font-size: 11px; color: var(--muted); }
+  .tune-row .val { width: 72px; text-align: right; font-variant-numeric: tabular-nums;
+    font-size: 12px; color: var(--ok); font-weight: 600; }
+  .tune-row .unit { font-size: 10px; color: var(--muted); width: 24px; }
+</style>
+</head>
+<body>
+
+<h1>🎯 <span>云台上位机 v5.10</span> · 激光打靶 / 矩形循迹</h1>
+
+<div class="app">
+
+<!-- ====== 左列：连接 + 任务控制 + 手动 + PID ====== -->
+<div class="left">
+
+  <!-- 连接 -->
+  <div class="card">
+    <div class="status">
+      <div class="dot" id="dot"></div>
+      <span id="statusText">未连接</span>
+      <span class="port-info" id="portInfo"></span>
+    </div>
+    <div class="row" style="margin-top:6px;gap:4px">
+      <select id="baudSelect" style="width:110px">
+        <option value="115200" selected>115200</option>
+        <option value="9600">9600</option>
+      </select>
+      <button class="btn primary" id="connectBtn">连接串口</button>
+      <button class="btn danger" id="disconnectBtn" style="display:none">断开</button>
+    </div>
+    <div class="hint">CH340 接 <b>USART1 @115200</b>：单口同时收发命令与遥测（K230/RECT/TASK 已镜像到此口）。蓝牙口为 USART2 @9600。</div>
+  </div>
+
+  <!-- 任务控制（当前项目核心菜单） -->
+  <div class="card">
+    <div class="section">🎮 K230 任务控制 <span class="badge" id="taskActiveBadge">--</span></div>
+    <div class="task-grid">
+      <button class="btn task-btn" id="btnAim"      data-cmd="aim">🎯 自动打靶<br>AIM</button>
+      <button class="btn task-btn" id="btnRecenter" data-cmd="recenter">🎯 激光对中<br>RECENTER</button>
+      <button class="btn task-btn" id="btnBorder"   data-cmd="border">▭ 外框循迹<br>BORDER</button>
+      <button class="btn task-btn inner" id="btnInner" data-cmd="inner">◼ 内框循迹<br>INNER</button>
+      <button class="btn danger task-btn" id="btnStop" data-cmd="stop" style="grid-column:1/3">⏹ 停止 STOP（同步停 K230 任务）</button>
+    </div>
+    <div class="hint">点击即下发对应命令，STM32 转发给 K230 并同步本地状态（等效于板载 PA0/PA1）。当前任务会随 TASK 遥测高亮。内框循迹 = 电工胶带矩形四点定位。</div>
+  </div>
+
+  <!-- 手动控制 -->
+  <div class="card">
+    <div class="section">🛠 舵机手动调试 <span class="badge">切位置环</span></div>
+    <div class="row" style="gap:4px;margin-bottom:6px">
+      <button class="btn sm toggle-on" id="axisPan">Pan</button>
+      <button class="btn sm" id="axisTilt">Tilt</button>
+      <button class="btn sm" data-cmd="c">▶ 正转</button>
+      <button class="btn sm" data-cmd="a">◀ 反转</button>
+      <button class="btn sm" data-cmd="s">⏹ 停</button>
+    </div>
+    <div class="row wrap" style="gap:3px">
+      <button class="btn sm" data-cmd="r45">转45°</button>
+      <button class="btn sm" data-cmd="r90">转90°</button>
+      <button class="btn sm" data-cmd="+100">+100步</button>
+      <button class="btn sm" data-cmd="-100">-100步</button>
+      <button class="btn sm" data-cmd="i">反Pan</button>
+      <button class="btn sm" data-cmd="I">反Tilt</button>
+      <button class="btn sm" data-cmd="h">半步</button>
+      <button class="btn sm" data-cmd="f">全步</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span style="font-size:11px;color:var(--muted)">速度</span>
+      <input type="range" id="speed" min="1300" max="10000" value="3000" step="100">
+      <span class="speed-val" id="speedVal">3000µs</span>
+    </div>
+    <div class="hint">也可角度定位：<code>x&lt;°&gt;</code> / <code>y&lt;°&gt;</code> / <code>home</code> / <code>z</code>。K230 再发帧即自动恢复 AUTO。</div>
+  </div>
+
+  <!-- PID 实时调参 -->
+  <div class="card">
+    <div class="section">🎛 K230 追踪 PID
+      <button class="btn sm primary" id="readPidBtn" style="margin-left:auto">读取当前</button>
+    </div>
+    <p style="font-size:10px;color:var(--warn);margin:0 0 6px">Kp 越小越柔 · Ki(减速区)越大越不冲 · Kd 阻尼抑过冲</p>
+    <div class="axis-block">
+      <div class="axis-title">Pan 水平轴</div>
+      <div class="tune-row">
+        <span class="lab">Kp</span>
+        <input type="range" data-axis="p" data-param="kp" min="0.001" max="0.05" step="0.001" value="0.005">
+        <span class="val" id="kp_p_v">0.005</span><span class="unit">/px</span>
+      </div>
+      <div class="tune-row">
+        <span class="lab">Ki</span>
+        <input type="range" data-axis="p" data-param="ki" min="10" max="150" step="1" value="60">
+        <span class="val" id="ki_p_v">60</span><span class="unit">px</span>
+      </div>
+      <div class="tune-row">
+        <span class="lab">Kd</span>
+        <input type="range" data-axis="p" data-param="kd" min="0" max="0.01" step="0.0005" value="0.0005">
+        <span class="val" id="kd_p_v">0.0005</span><span class="unit">·s</span>
+      </div>
+    </div>
+    <div class="axis-block">
+      <div class="axis-title tilt">Tilt 俯仰轴</div>
+      <div class="tune-row">
+        <span class="lab">Kp</span>
+        <input type="range" data-axis="t" data-param="kp" min="0.001" max="0.05" step="0.001" value="0.004">
+        <span class="val" id="kp_t_v">0.004</span><span class="unit">/px</span>
+      </div>
+      <div class="tune-row">
+        <span class="lab">Ki</span>
+        <input type="range" data-axis="t" data-param="ki" min="10" max="150" step="1" value="50">
+        <span class="val" id="ki_t_v">50</span><span class="unit">px</span>
+      </div>
+      <div class="tune-row">
+        <span class="lab">Kd</span>
+        <input type="range" data-axis="t" data-param="kd" min="0" max="0.01" step="0.0005" value="0.0005">
+        <span class="val" id="kd_t_v">0.0005</span><span class="unit">·s</span>
+      </div>
+    </div>
+    <div class="hint">拖动即下发 <code>g &lt;轴&gt; &lt;参数&gt; &lt;值&gt;</code>。<br>追得慢→提 Kp · 仍过冲→加 Ki 或 Kd · 先调 Pan 再调 Tilt。</div>
+  </div>
+
+</div>
+
+<!-- ====== 右列：追踪状态 + PID 曲线 + 串口监视 ====== -->
+<div class="right">
+
+  <!-- K230 追踪状态 -->
+  <div class="card" id="trackCard" style="display:none">
+    <div class="section">🎯 追踪状态 <span class="badge" id="trackMode">--</span></div>
+    <div class="tg">
+      <span class="l">Pan 误差</span><span class="v c" id="tPanErr">--</span>
+      <span class="l">Tilt 误差</span><span class="v c" id="tTiltErr">--</span>
+      <span class="l">PID_P 输出</span><span class="v" id="tPidP">--</span>
+      <span class="l">PID_T 输出</span><span class="v" id="tPidT">--</span>
+      <span class="l">减速区 Pan</span><span class="v" id="tDecP">--</span>
+      <span class="l">减速区 Tilt</span><span class="v" id="tDecT">--</span>
+      <span class="l">命中</span><span class="v" id="tHit">--</span>
+      <span class="l">模式</span><span class="v" id="tMode">--</span>
+    </div>
+  </div>
+
+  <!-- K230 任务状态 -->
+  <div class="card" id="taskCard" style="display:none">
+    <div class="section">📋 任务状态 <span class="badge" id="taskBadge">IDLE</span></div>
+    <div class="tg">
+      <span class="l">当前任务</span><span class="v" id="taskName">--</span>
+      <span class="l">运行状态</span><span class="v" id="taskRun">待命</span>
+      <span class="l">完成</span><span class="v" id="taskDone">--</span>
+    </div>
+  </div>
+
+  <!-- 矩形识别 -->
+  <div class="card" id="rectCard" style="display:none">
+    <div class="section">🔲 矩形识别 (靶板外框) <span class="badge" id="rectValid">--</span></div>
+    <div class="row" style="gap:16px;align-items:flex-start">
+      <div class="tg" style="flex:1">
+        <span class="l">中心X偏移</span><span class="v c" id="rDx">--</span>
+        <span class="l">中心Y偏移</span><span class="v c" id="rDy">--</span>
+        <span class="l">宽度 W</span><span class="v" id="rW">--</span>
+        <span class="l">高度 H</span><span class="v" id="rH">--</span>
+        <span class="l">倾斜角</span><span class="v" id="rAng">--</span>
+        <span class="l">原点有效</span><span class="v" id="rOrigin">--</span>
+      </div>
+      <canvas id="rectCanvas" width="200" height="200" style="background:#060a14;border-radius:6px;flex-shrink:0"></canvas>
+    </div>
+    <div class="hint">以靶心为原点：偏移 = 矩形中心 − 靶心（右/下为正）。倾斜角为矩形相对水平的旋转。</div>
+  </div>
+
+  <!-- PID 实时曲线 -->
+  <div class="card">
+    <div class="section">
+      📈 PID 实时曲线
+      <span class="badge" id="chartPoints">0 点</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="pauseChart"> 暂停
+        </label>
+        <button class="btn sm" id="clearChart">清零</button>
+        <button class="btn sm" id="chartModeBtn">跟踪</button>
+      </span>
+    </div>
+    <div class="chart-wrap"><canvas id="pidChart"></canvas></div>
+    <div class="chart-legend">
+      <span><span class="legend-dot" style="background:var(--ch1)"></span> Pan误差</span>
+      <span><span class="legend-dot" style="background:var(--ch2)"></span> Tilt误差</span>
+      <span><span class="legend-dot" style="background:var(--ch3)"></span> PID_P</span>
+      <span><span class="legend-dot" style="background:var(--ch4)"></span> PID_T</span>
+      <span id="chartTimeRange" style="margin-left:auto;font-size:10px;color:var(--muted)"></span>
+    </div>
+    <div class="axis-note">左轴(青/红) = 误差 px · 右轴(绿/黄) = PID 输出 ±1 · 带末尾值标签</div>
+  </div>
+
+  <!-- 串口监视 -->
+  <div class="card">
+    <div class="section">
+      串口监视 <span class="badge" id="echoCount">0</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--muted);cursor:pointer" id="clearBtn">清空</span>
+    </div>
+    <div class="term" id="term"></div>
+    <div class="cmd-row">
+      <input type="text" id="cmdInput" placeholder="自定义命令… 例: aim / inner / P / ? / g p kp 0.01" spellcheck="false">
+      <button class="btn sm primary" id="sendCmdBtn">发送</button>
+      <select id="cmdPreset" onchange="if(this.value)send(this.value)">
+        <option value="">📋 快捷</option>
+        <option value="aim">aim 自动打靶</option>
+        <option value="recenter">recenter 对中</option>
+        <option value="border">border 外框</option>
+        <option value="inner">inner 内框</option>
+        <option value="stop">stop 停止</option>
+        <option value="tele on">tele on 开遥测</option>
+        <option value="?">? 状态</option>
+        <option value="P">P 查PID</option>
+        <option value="k">k K230</option>
+        <option value="m">m 位置环</option>
+        <option value="z">z 归零</option>
+      </select>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+/* ===================== PID 曲线引擎 ===================== */
+const CHART_MAX = 400;
+const chartData = { panErr: [], tiltErr: [], pidP: [], pidT: [], time: [] };
+let chartPaused = false;
+let chartAutoScroll = true;
+const canvas = document.getElementById('pidChart');
+const ctx = canvas.getContext('2d');
+let chartAnim = null;
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = 210 * devicePixelRatio;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '210px';
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function pushChartData(panErr, tiltErr, pidP, pidT) {
+  if (chartPaused) return;
+  const push = (arr, v) => {
+    if (v === undefined || v === null || isNaN(v)) v = 0;
+    arr.push(v); if (arr.length > CHART_MAX) arr.shift();
+  };
+  push(chartData.panErr, panErr);
+  push(chartData.tiltErr, tiltErr);
+  push(chartData.pidP, pidP);
+  push(chartData.pidT, pidT);
+  chartData.time.push(Date.now());
+  if (chartData.time.length > CHART_MAX) chartData.time.shift();
+  document.getElementById('chartPoints').textContent = chartData.panErr.length + ' 点';
+  if (!chartAnim) chartAnim = requestAnimationFrame(() => { chartAnim = null; drawChart(); });
+}
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  return d.getMinutes().toString().padStart(2,'0') + ':' +
+         d.getSeconds().toString().padStart(2,'0') + '.' +
+         (d.getMilliseconds()/100).toFixed(0);
+}
+
+function drawChart() {
+  const w = canvas.width / devicePixelRatio, h = 210;
+  const pad = { t: 14, b: 18, l: 40, r: 40 };
+  const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#060a14'; ctx.fillRect(0, 0, w, h);
+
+  const n = chartData.panErr.length;
+  if (n < 2) {
+    ctx.fillStyle = '#4a5568'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('等待 K230 遥测…', w/2, h/2); return;
+  }
+
+  let errMax = 5;
+  for (const v of chartData.panErr) errMax = Math.max(errMax, Math.abs(v));
+  for (const v of chartData.tiltErr) errMax = Math.max(errMax, Math.abs(v));
+  errMax = Math.ceil(errMax / 5) * 5;
+  if (errMax < 5) errMax = 5;
+  const pidMax = 1.0;
+
+  const errY = v => pad.t + ((v + errMax) / (2 * errMax)) * ph;
+  const pidY = v => pad.t + ((v + pidMax) / (2 * pidMax)) * ph;
+
+  const gridLines = 5;
+  ctx.font = '9px monospace';
+  for (let i = 0; i <= gridLines; i++) {
+    const y = pad.t + (i / gridLines) * ph;
+    ctx.strokeStyle = (i === gridLines/2) ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+    const ev = errMax - (i / gridLines) * (2 * errMax);
+    ctx.fillStyle = '#4a5568'; ctx.textAlign = 'right';
+    ctx.fillText(Math.round(ev), pad.l - 4, y + 3);
+    const pv = pidMax - (i / gridLines) * (2 * pidMax);
+    ctx.textAlign = 'left';
+    ctx.fillText(pv.toFixed(1), w - pad.r + 4, y + 3);
+  }
+  const zeroY = pad.t + ph / 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w - pad.r, zeroY); ctx.stroke();
+
+  const tStart = chartData.time[0], tEnd = chartData.time[n - 1];
+  const span = Math.max(1000, tEnd - tStart);
+  document.getElementById('chartTimeRange').textContent =
+    `⌛ ${(span/1000).toFixed(0)}s 窗口 (${chartAutoScroll ? '跟踪' : '固定'})`;
+  ctx.font = '8px monospace'; ctx.fillStyle = '#3a4455'; ctx.textAlign = 'center';
+  const tStep = Math.max(1, Math.floor(span / 4000) * 1000);
+  for (let t = Math.ceil(tStart / tStep) * tStep; t <= tEnd; t += tStep) {
+    const frac = (t - tStart) / span;
+    const x = pad.l + frac * pw;
+    ctx.fillText(formatTime(t), x, h - 3);
+  }
+
+  const series = [
+    { key: 'panErr', color: '#00e5ff', y: errY, dec: 0 },
+    { key: 'tiltErr', color: '#ff4d6d', y: errY, dec: 0 },
+    { key: 'pidP', color: '#00ff88', y: pidY, dec: 3 },
+    { key: 'pidT', color: '#ffd93d', y: pidY, dec: 3 },
+  ];
+  for (const s of series) {
+    const data = chartData[s.key];
+    if (data.length < 2) continue;
+    ctx.strokeStyle = s.color; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const frac = (chartData.time[i] - tStart) / span;
+      const x = pad.l + frac * pw, y = s.y(data[i]);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    const last = data[data.length - 1];
+    const lf = (chartData.time[n - 1] - tStart) / span;
+    const lx = pad.l + lf * pw, ly = s.y(last);
+    ctx.fillStyle = s.color; ctx.font = '9px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(last.toFixed(s.dec), Math.min(lx + 4, w - pad.r - 32), Math.max(ly - 4, pad.t + 9));
+  }
+}
+
+/* ===================== Web Serial ===================== */
+let port = null, reader = null, keepReading = false;
+const enc = new TextEncoder(), dec = new TextDecoder();
+const $ = id => document.getElementById(id);
+const dot = $('dot'), statusText = $('statusText'), portInfo = $('portInfo');
+const connectBtn = $('connectBtn'), disconnectBtn = $('disconnectBtn'), baudSelect = $('baudSelect');
+const term = $('term'), cmdInput = $('cmdInput'), echoCount = $('echoCount');
+const speed = $('speed'), speedVal = $('speedVal');
+let lineCount = 0, lastPidAxis = '';
+let lastK230Line = '';
+
+function log(msg, color) {
+  const line = document.createElement('div');
+  if (msg.startsWith('# OK')) line.innerHTML = '<span style="color:var(--ok)">'+esc(msg)+'</span>';
+  else if (msg.startsWith('# ERR')) line.innerHTML = '<span style="color:var(--err)">'+esc(msg)+'</span>';
+  else if (msg.startsWith('»')) line.innerHTML = '<span style="color:var(--accent)">'+esc(msg)+'</span>';
+  else if (msg.startsWith('K230,')) line.innerHTML = '<span style="color:var(--warn)">'+esc(msg)+'</span>';
+  else if (color) { line.style.color = color; line.textContent = msg; }
+  else line.textContent = msg;
+  term.appendChild(line); term.scrollTop = term.scrollHeight;
+  lineCount++; echoCount.textContent = lineCount;
+  while (term.childNodes.length > 200) { term.removeChild(term.firstChild); lineCount--; }
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function setConnected(on) {
+  dot.classList.toggle('on', on); statusText.textContent = on ? '已连接' : '未连接';
+  connectBtn.style.display = on ? 'none' : 'block';
+  disconnectBtn.style.display = on ? 'block' : 'none';
+  baudSelect.disabled = on;
+}
+
+/* ---- K230 紧凑遥测解析 (K230,P:..,T:..,PP:..,PT:..,I:..,J:..,H:..,S:..) ---- */
+function parseReport(line) {
+  const m = {};
+  line.split(',').forEach(tok => { const i = tok.indexOf(':'); if (i > 0) m[tok.slice(0,i)] = tok.slice(i+1); });
+  const panErr = parseInt(m.P) || 0;
+  const tiltErr = parseInt(m.T) || 0;
+  const pidP = parseFloat(m.PP) || 0;
+  const pidT = parseFloat(m.PT) || 0;
+  const decP = parseFloat(m.I) || 0;
+  const decT = parseFloat(m.J) || 0;
+  const hit = m.H === '1';
+  const mode = m.S;
+
+  $('trackCard').style.display = 'block';
+  $('trackMode').textContent = mode === 'A' ? 'AUTO 🎯' : (mode === 'M' ? 'MANUAL' : '--');
+  $('tPanErr').textContent = (panErr > 0 ? '+' : '') + panErr + 'px';
+  $('tPanErr').className = 'v c' + (Math.abs(panErr) > 10 ? ' e' : '');
+  $('tTiltErr').textContent = (tiltErr > 0 ? '+' : '') + tiltErr + 'px';
+  $('tTiltErr').className = 'v c' + (Math.abs(tiltErr) > 10 ? ' e' : '');
+  $('tPidP').textContent = pidP.toFixed(3);
+  $('tPidT').textContent = pidT.toFixed(3);
+  $('tDecP').textContent = decP.toFixed(0) + 'px';
+  $('tDecT').textContent = decT.toFixed(0) + 'px';
+  $('tHit').textContent = hit ? 'YES ✓' : 'no';
+  $('tHit').className = 'v' + (hit ? ' h' : '');
+  $('tMode').textContent = mode === 'A' ? 'AUTO' : 'MAN';
+
+  pushChartData(panErr, tiltErr, pidP, pidT);
+}
+
+/* ---- K230 任务状态 (TASK,id,done) —— 命令帧切换 + 完成上报 ---- */
+const TASK_NAMES = ['IDLE / AIM (自动跟随)', 'RECENTER (激光对中)', 'BORDER (绕外框)', 'INNER (绕内框)'];
+const TASK_BTN  = { 0: 'btnAim', 1: 'btnRecenter', 2: 'btnBorder', 3: 'btnInner' };
+function parseTask(line) {
+  const p = line.split(',');
+  if (p.length < 3) return;
+  const id   = parseInt(p[1]) || 0;
+  const done = p[2].trim() === '1';
+
+  $('taskCard').style.display = 'block';
+  $('taskName').textContent = TASK_NAMES[id] || ('未知#' + id);
+  $('taskBadge').textContent = id === 0 ? 'IDLE' : ('T' + id);
+  $('taskActiveBadge').textContent = (TASK_NAMES[id] || ('T' + id)).split(' ')[0];
+
+  if (done) {
+    $('taskRun').textContent  = '✅ 完成';
+    $('taskRun').style.color  = '#00ff88';
+    $('taskDone').textContent = 'YES ✓';
+    $('taskDone').style.color = '#00ff88';
+  } else if (id !== 0) {
+    $('taskRun').textContent  = '进行中…';
+    $('taskRun').style.color  = '#ffd166';
+    $('taskDone').textContent = 'NO';
+    $('taskDone').style.color = '#ffd166';
+  } else {
+    $('taskRun').textContent  = '待命';
+    $('taskRun').style.color  = 'var(--muted)';
+    $('taskDone').textContent = '--';
+    $('taskDone').style.color = 'var(--muted)';
+  }
+
+  /* 高亮当前任务按钮 */
+  ['btnAim','btnRecenter','btnBorder','btnInner','btnStop'].forEach(b => $(b).classList.remove('active'));
+  if (TASK_BTN[id]) $(TASK_BTN[id]).classList.add('active');
+}
+
+/* ---- 矩形识别结果 (RECT,dx,dy,w,h,ang,valid) ---- */
+const rectState = { dx:0, dy:0, w:0, h:0, ang:0, valid:0, origin:0 };
+const rectCanvas = document.getElementById('rectCanvas');
+const rctx = rectCanvas.getContext('2d');
+
+function parseRect(line) {
+  const p = line.split(',');
+  if (p.length < 7) return;
+  let v = parseInt(p[6]) || 0;
+  rectState.origin = (v & 2) ? 1 : 0;
+  rectState.valid = (v & 1) ? 1 : 0;
+  rectState.dx = parseInt(p[1]) || 0;
+  rectState.dy = parseInt(p[2]) || 0;
+  rectState.w  = parseInt(p[3]) || 0;
+  rectState.h  = parseInt(p[4]) || 0;
+  rectState.ang = parseInt(p[5]) || 0;
+
+  $('rectCard').style.display = 'block';
+  $('rectValid').textContent = rectState.valid ? 'VALID' : '无效';
+  $('rectValid').style.color = rectState.valid ? '#00ff88' : '#ff4d6d';
+  $('rDx').textContent = (rectState.dx>0?'+':'') + rectState.dx + 'px';
+  $('rDy').textContent = (rectState.dy>0?'+':'') + rectState.dy + 'px';
+  $('rW').textContent  = rectState.w + 'px';
+  $('rH').textContent  = rectState.h + 'px';
+  $('rAng').textContent = (rectState.ang/10).toFixed(1) + '°';
+  $('rOrigin').textContent = rectState.origin ? 'YES' : 'NO';
+  $('rOrigin').className = 'v' + (rectState.origin ? ' o' : ' e');
+  drawRectCanvas();
+}
+
+function drawRectCanvas() {
+  const W = rectCanvas.width, H = rectCanvas.height;
+  rctx.clearRect(0,0,W,H);
+  rctx.fillStyle = '#060a14'; rctx.fillRect(0,0,W,H);
+  const cx = W/2, cy = H/2;
+  rctx.strokeStyle = 'rgba(255,255,255,0.12)'; rctx.lineWidth = 1;
+  rctx.beginPath(); rctx.moveTo(0, cy); rctx.lineTo(W, cy); rctx.moveTo(cx, 0); rctx.lineTo(cx, H); rctx.stroke();
+  rctx.strokeStyle = '#00ff88'; rctx.lineWidth = 1.5;
+  rctx.beginPath(); rctx.moveTo(cx-6, cy); rctx.lineTo(cx+6, cy); rctx.moveTo(cx, cy-6); rctx.lineTo(cx, cy+6); rctx.stroke();
+  if (!rectState.valid) return;
+  const scale = (Math.min(W,H) * 0.42) / Math.max(1, Math.max(rectState.w, rectState.h, Math.abs(rectState.dx), Math.abs(rectState.dy)));
+  const rx = cx + rectState.dx * scale;
+  const ry = cy + rectState.dy * scale;
+  const rw = Math.max(4, rectState.w * scale);
+  const rh = Math.max(4, rectState.h * scale);
+  const ang = rectState.ang / 10 * Math.PI / 180;
+  rctx.save();
+  rctx.translate(rx, ry);
+  rctx.rotate(ang);
+  rctx.strokeStyle = '#b14bff'; rctx.lineWidth = 2;
+  rctx.strokeRect(-rw/2, -rh/2, rw, rh);
+  rctx.restore();
+  rctx.strokeStyle = '#00e5ff'; rctx.lineWidth = 1.5;
+  rctx.beginPath(); rctx.moveTo(cx, cy); rctx.lineTo(rx, ry); rctx.stroke();
+}
+
+/* ---- P 回显解析: 读取当前 PID 填入滑块 ---- */
+function parsePidReply(line) {
+  if (line.includes('Pan') && line.includes('PID')) lastPidAxis = 'p';
+  else if (line.includes('Tilt') && line.includes('PID')) lastPidAxis = 't';
+  const mm = line.match(/Kp=([\d.]+)\s+Ki=([\d.]+)\s+Kd=([\d.]+)/);
+  if (mm && lastPidAxis) {
+    setSlider(lastPidAxis, 'kp', parseFloat(mm[1]));
+    setSlider(lastPidAxis, 'ki', parseFloat(mm[2]));
+    setSlider(lastPidAxis, 'kd', parseFloat(mm[3]));
+  }
+}
+function setSlider(axis, param, val) {
+  const el = document.querySelector(`input[data-axis="${axis}"][data-param="${param}"]`);
+  if (!el) return;
+  el.value = val;
+  const display = $(`${param}_${axis}_v`);
+  if (display) display.textContent = val.toFixed(param === 'ki' ? 0 : 4);
+  el.dispatchEvent(new Event('input'));
+}
+
+async function connect() {
+  if (!('serial' in navigator)) { log('⚠ 浏览器不支持 Web Serial，请用 Chrome / Edge', '#ff4d6d'); return; }
+  if (port) { try { await disconnect(); } catch(_) {} }
+  try {
+    port = await navigator.serial.requestPort();
+    const info = port.getInfo();
+    portInfo.textContent = info.usbVendorId
+      ? `USB ${info.usbVendorId.toString(16)}:${info.usbProductId.toString(16)}` : '';
+    await port.open({ baudRate: parseInt(baudSelect.value, 10) });
+    keepReading = true;
+    log(`串口已打开 ✓ ${baudSelect.value} baud`);
+    setConnected(true);
+    /* 默认开启遥测, 让曲线/状态面板有数据 */
+    send('tele on');
+    readLoop();
+  } catch (e) { log('连接失败: ' + e.message, '#ff4d6d'); port = null; }
+}
+
+async function readLoop() {
+  while (port && port.readable && keepReading) {
+    reader = port.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        handleData(value);
+      }
+    } catch (e) { if (keepReading) log('读错误: ' + e.message, '#ff4d6d'); }
+    finally { try { reader.releaseLock(); } catch(_) {} reader = null; }
+  }
+}
+
+function handleData(value) {
+  const str = dec.decode(value);
+  for (const raw of str.split('\n')) {
+    const l = raw.trim();
+    if (!l) continue;
+    if (l.startsWith('K230,')) {
+      if (l !== lastK230Line) log(l);
+      lastK230Line = l;
+      parseReport(l);
+    } else if (l.startsWith('RECT,')) {
+      lastK230Line = '';
+      log(l, '#b14bff');
+      parseRect(l);
+    } else if (l.startsWith('TASK,')) {
+      lastK230Line = '';
+      parseTask(l);
+    } else {
+      lastK230Line = '';
+      log(l);
+      parsePidReply(l);
+    }
+  }
+}
+
+async function send(cmd) {
+  if (!port || !port.writable) { log('⚠ 未连接', '#ff4d6d'); return; }
+  try {
+    const writer = port.writable.getWriter();
+    await writer.write(enc.encode(cmd + '\n')); writer.releaseLock();
+    log('» ' + cmd);
+  } catch (e) { log('发送失败: ' + e.message, '#ff4d6d'); }
+}
+
+async function disconnect() {
+  keepReading = false;
+  if (reader) { try { await reader.cancel(); } catch(_) {} }
+  let guard = 0;
+  while (reader && guard++ < 200) await new Promise(r => setTimeout(r, 10));
+  if (port) { try { await port.close(); } catch(_) {} port = null; }
+  setConnected(false); portInfo.textContent = ''; log('已断开');
+}
+
+if ('serial' in navigator) {
+  navigator.serial.addEventListener('disconnect', async (e) => {
+    if (port && e.target === port) {
+      log('设备已物理断开 (CH340 拔出)', '#ff4d6d');
+      keepReading = false;
+      if (reader) { try { await reader.cancel(); } catch(_) {} }
+      let g = 0; while (reader && g++ < 200) await new Promise(r => setTimeout(r, 10));
+      try { if (port) await port.close(); } catch(_) {}
+      port = null; setConnected(false); portInfo.textContent = '';
+    }
+  });
+}
+
+/* ===================== 事件绑定 ===================== */
+connectBtn.onclick = connect;
+disconnectBtn.onclick = disconnect;
+document.querySelectorAll('[data-cmd]').forEach(b => { b.onclick = () => send(b.dataset.cmd); });
+$('clearBtn').onclick = () => { term.innerHTML = ''; lineCount = 0; echoCount.textContent = '0'; };
+$('sendCmdBtn').onclick = () => { const v = cmdInput.value.trim(); if (v) { send(v); cmdInput.value = ''; } };
+cmdInput.onkeydown = e => {
+  if (e.key === 'Enter') { const v = cmdInput.value.trim(); if (v) { send(v); cmdInput.value = ''; } e.preventDefault(); }
+};
+
+speed.oninput = () => { speedVal.textContent = speed.value + 'µs'; };
+speed.onchange = () => { send('v' + speed.value); };
+
+$('axisPan').onclick = () => { send('p'); $('axisPan').className = 'btn sm toggle-on'; $('axisTilt').className = 'btn sm'; };
+$('axisTilt').onclick = () => { send('t'); $('axisTilt').className = 'btn sm toggle-on'; $('axisPan').className = 'btn sm'; };
+
+document.querySelectorAll('.tune-row input[type=range]').forEach(s => {
+  const lab = $(`${s.dataset.param}_${s.dataset.axis}_v`);
+  s.addEventListener('input', () => {
+    const v = parseFloat(s.value);
+    lab.textContent = s.dataset.param === 'ki' ? v.toFixed(0) : v.toFixed(4);
+  });
+  s.addEventListener('change', () => {
+    const v = parseFloat(s.value);
+    send(`g ${s.dataset.axis} ${s.dataset.param} ${v.toFixed(4)}`);
+  });
+});
+$('readPidBtn').onclick = () => { lastPidAxis = ''; send('P'); };
+
+$('pauseChart').onchange = function () { chartPaused = this.checked; if (!chartPaused) drawChart(); };
+$('clearChart').onclick = () => {
+  chartData.panErr.length = 0; chartData.tiltErr.length = 0;
+  chartData.pidP.length = 0; chartData.pidT.length = 0; chartData.time.length = 0;
+  drawChart();
+};
+$('chartModeBtn').onclick = function () {
+  chartAutoScroll = !chartAutoScroll;
+  this.textContent = chartAutoScroll ? '跟踪' : '固定';
+};
+
+if (!('serial' in navigator)) {
+  log('⚠ 当前浏览器不支持 Web Serial，请用 Chrome / Edge 打开', '#ff4d6d');
+  connectBtn.disabled = true;
+}
+drawChart();
+</script>
+</body>
+</html>

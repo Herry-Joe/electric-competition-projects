@@ -1,0 +1,18 @@
+# WorkBuddy project logs
+.workbuddy/
+
+# PlatformIO build artifacts
+.pio/
+
+# Python
+__pycache__/
+*.pyc
+pc_host/__pycache__/
+
+# IDE
+.vscode/
+*.code-workspace
+
+# OS
+Thumbs.db
+.DS_Store

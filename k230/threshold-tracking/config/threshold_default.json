@@ -1,0 +1,7 @@
+{
+  "description": "脱机阈值追踪 出厂默认校准 (可手动改, 或运行时按 Save 覆盖到 SD 卡 /sdcard/threshold_config.json)",
+  "thresholds": [0, 100, -128, 127, -128, 127],
+  "roi": null,
+  "note": "进入 MASK 模式后拖滑块逐步收紧 L/A/B 区间到只命中目标, 再按 Save 落盘; 字段含义见 README §3 协议与 §4 标定流程",
+  "field_order": ["Lmin", "Lmax", "Amin", "Amax", "Bmin", "Bmax"]
+}

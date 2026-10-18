@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>步进云台指挥中心</title>
+<style>
+/* ============================================================
+   Design Tokens — 亮 / 暗双主题 (霓虹指挥中心风)
+   ============================================================ */
+:root{
+  --bg:#f1f5f9;
+  --bg-grad:radial-gradient(1200px 700px at 80% -10%,#e0e7ff 0%,transparent 60%),
+             radial-gradient(900px 600px at -10% 110%,#cffafe 0%,transparent 55%),
+             #f1f5f9;
+  --surface:#ffffff;
+  --surface-2:#f8fafc;
+  --surface-3:#eef2f7;
+  --text:#0f172a;
+  --text-muted:#475569;
+  --border:#e2e8f0;
+  --border-strong:#cbd5e1;
+  --primary:#4f46e5;
+  --primary-hover:#4338ca;
+  --primary-soft:#eef2ff;
+  --success:#15803d;
+  --success-soft:#dcfce7;
+  --warning:#b45309;
+  --warning-soft:#fef3c7;
+  --warning-text:#1c1917;
+  --danger:#dc2626;
+  --danger-soft:#fee2e2;
+  --info:#0891b2;
+  --chart-grid:#e2e8f0;
+  --chart-axis:#94a3b8;
+  --term-bg:#0b1120;
+  --term-fg:#5eead4;
+  --glow:0 0 0 transparent;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.06);
+  --shadow-md:0 6px 16px rgba(15,23,42,.08);
+  --shadow-lg:0 14px 34px rgba(15,23,42,.10);
+  --radius:14px;
+  --radius-sm:9px;
+  --space:4px;
+  --font:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html[data-theme="dark"]{
+  --bg:#070b16;
+  --bg-grad:radial-gradient(1100px 700px at 82% -12%,rgba(99,102,241,.22) 0%,transparent 58%),
+             radial-gradient(900px 620px at -12% 112%,rgba(6,182,212,.16) 0%,transparent 55%),
+             #070b16;
+  --surface:rgba(20,28,46,.72);
+  --surface-2:rgba(15,22,38,.6);
+  --surface-3:rgba(30,41,61,.55);
+  --text:#e8edf7;
+  --text-muted:#94a3b8;
+  --border:rgba(99,130,180,.18);
+  --border-strong:rgba(129,150,200,.32);
+  --primary:#818cf8;
+  --primary-hover:#a5b4fc;
+  --primary-soft:rgba(99,102,241,.18);
+  --success:#34d399;
+  --success-soft:rgba(16,185,129,.16);
+  --warning:#fbbf24;
+  --warning-soft:rgba(251,191,36,.14);
+  --warning-text:#fde68a;
+  --danger:#fb7185;
+  --danger-soft:rgba(244,63,94,.16);
+  --info:#22d3ee;
+  --chart-grid:rgba(120,150,200,.14);
+  --chart-axis:rgba(148,163,184,.6);
+  --term-bg:#020617;
+  --term-fg:#5eead4;
+  --glow:0 0 22px rgba(99,102,241,.35);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  --shadow-md:0 8px 22px rgba(0,0,0,.45);
+  --shadow-lg:0 18px 44px rgba(0,0,0,.55);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  background:var(--bg-grad) fixed;
+  background-color:var(--bg);
+  color:var(--text);
+  min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--primary-soft);color:var(--text)}
+button,input,select{font-family:inherit}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:6px}
+
+/* ============================================================
+   App shell
+   ============================================================ */
+.app{display:grid;grid-template-columns:256px 1fr;min-height:100vh}
+@media(max-width:900px){.app{grid-template-columns:1fr}}
+
+/* ---- Sidebar ---- */
+.sidebar{
+  background:var(--surface-2);
+  backdrop-filter:blur(14px);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:18px 14px;gap:6px;
+  position:sticky;top:0;height:100vh;
+}
+@media(max-width:900px){.sidebar{position:static;height:auto;flex-direction:column;
+  border-right:none;border-bottom:1px solid var(--border);padding:12px}}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 8px 16px}
+.brand .logo{width:38px;height:38px;border-radius:11px;
+  background:linear-gradient(135deg,var(--primary),var(--info));
+  display:grid;place-items:center;font-size:19px;flex:none;
+  box-shadow:var(--glow)}
+.brand .name{font-size:15px;font-weight:800;letter-spacing:.2px;line-height:1.15}
+.brand .sub{font-size:11px;color:var(--text-muted);font-weight:500}
+
+.nav{display:flex;flex-direction:column;gap:3px}
+.nav-group{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text-muted);padding:14px 12px 5px;opacity:.8}
+.nav button{
+  display:flex;align-items:center;gap:11px;padding:11px 13px;border:none;background:transparent;
+  color:var(--text-muted);font-size:14px;font-weight:600;cursor:pointer;border-radius:11px;
+  text-align:left;white-space:nowrap;transition:all .16s;min-height:44px;
+}
+.nav button .ico{width:22px;text-align:center;font-size:16px;flex:none}
+.nav button:hover{background:var(--surface-3);color:var(--text)}
+.nav button.active{background:var(--primary-soft);color:var(--primary);font-weight:700;
+  box-shadow:inset 0 0 0 1px var(--border-strong),var(--glow)}
+.nav button:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+
+.sidebar-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:14px}
+@media(max-width:900px){.sidebar-foot{margin-top:8px;flex-direction:row;align-items:center;gap:10px}
+  .nav-group{display:none}}
+.theme-toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);
+  background:var(--surface-3);border:1px solid var(--border);border-radius:11px;
+  padding:9px 12px;cursor:pointer;min-height:40px;transition:all .15s}
+.theme-toggle:hover{color:var(--text);border-color:var(--border-strong)}
+.conn-mini{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600;padding:0 4px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--border-strong);flex:none;transition:background .2s}
+.dot.on{background:var(--success);box-shadow:0 0 0 4px var(--success-soft);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px var(--success-soft)}50%{box-shadow:0 0 0 7px transparent}}
+
+/* ---- Content ---- */
+.content{display:flex;flex-direction:column;min-width:0}
+.topbar{
+  position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:13px 22px;background:color-mix(in srgb,var(--surface) 82%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--border);
+}
+.topbar h1{font-size:18px;font-weight:800;letter-spacing:.2px}
+.topbar .spacer{margin-left:auto}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
+  padding:7px 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2)}
+.pill .dot{width:8px;height:8px}
+.mode-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+  padding:6px 13px;border-radius:999px;background:var(--primary-soft);color:var(--primary);
+  border:1px solid var(--border-strong)}
+
+/* 常驻 HUD 实时指标 */
+.hud{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hud .metric{display:flex;flex-direction:column;align-items:flex-start;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+  padding:5px 12px;min-width:62px;line-height:1.15}
+.hud .metric .mv{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.hud .metric .ml{font-size:9.5px;color:var(--text-muted);font-weight:600;letter-spacing:.04em}
+.hud .metric.pan .mv{color:var(--danger)}
+.hud .metric.tilt .mv{color:var(--primary)}
+
+/* ---- Tabs ---- */
+.tab{display:none;padding:22px;max-width:1180px;width:100%;margin:0 auto;animation:fade .25s ease}
+.tab.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.tab{animation:none}.dot.on{animation:none}}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.card{background:var(--surface);backdrop-filter:blur(10px);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm);
+  transition:box-shadow .2s,transform .2s,border-color .2s}
+.card:hover{box-shadow:var(--shadow-md);border-color:var(--border-strong)}
+.card h3{font-size:15px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card p.note{font-size:13px;color:var(--text-muted);line-height:1.75;margin-top:10px}
+
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.row:last-child{margin-bottom:0}
+.row label{font-size:13px;color:var(--text-muted);min-width:64px;font-weight:600}
+input,select{padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);
+  font-size:14px;background:var(--surface-2);color:var(--text);transition:border-color .15s,box-shadow .15s}
+input:hover,select:hover{border-color:var(--primary)}
+input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+input[type=number]{width:96px}
+input[type=range]{flex:1;min-width:90px;accent-color:var(--primary);height:28px;cursor:pointer}
+
+button.btn{padding:10px 18px;border:none;border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,var(--primary),var(--primary-hover));color:#fff;
+  font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;min-height:44px;
+  transition:filter .15s,transform .1s,box-shadow .15s;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  box-shadow:0 6px 18px rgba(79,70,229,.25)}
+button.btn:hover{filter:brightness(1.08);box-shadow:0 8px 22px rgba(79,70,229,.35)}
+button.btn:active{transform:translateY(1px)}
+button.btn:disabled{background:var(--border-strong);color:var(--text-muted);cursor:not-allowed;box-shadow:none}
+button.btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);box-shadow:none}
+button.btn.ghost:hover{background:var(--surface-3);box-shadow:none}
+button.btn.success{background:linear-gradient(135deg,var(--success),#059669)}
+button.btn.success:hover{filter:brightness(1.08)}
+button.btn.danger{background:linear-gradient(135deg,var(--danger),#e11d48)}
+button.btn.danger:hover{filter:brightness(1.08)}
+button.btn.amber{background:linear-gradient(135deg,var(--warning),#d97706);color:var(--warning-text)}
+button.btn.sm{padding:6px 12px;font-size:12px;min-height:34px;border-radius:7px;box-shadow:none}
+button.btn.sm:hover{filter:brightness(1.05)}
+
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.slider-row .lab{width:54px;font-size:13px;color:var(--text-muted);text-align:right;font-weight:600}
+.slider-row .val{width:78px;text-align:right;font-variant-numeric:tabular-nums;font-size:13px;
+  font-weight:700;background:var(--surface-3);border-radius:7px;padding:4px 8px}
+.slider-row .btn.sm{min-width:40px}
+
+.val-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}
+.val-item{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px 8px;text-align:center;transition:border-color .2s}
+.val-item .num{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.val-item .lbl{font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:600}
+.val-item.pan .num{color:var(--danger)}
+.val-item.tilt .num{color:var(--primary)}
+
+canvas{width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);display:block;
+  background:var(--surface-2)}
+#posChart{height:220px}
+#pidChart{height:240px}
+#radar{height:300px;background:
+  radial-gradient(circle at 50% 50%,rgba(99,102,241,.08),transparent 70%),var(--surface-2)}
+#term{width:100%;height:240px;font-family:var(--mono);font-size:12.5px;
+  background:var(--term-bg);color:var(--term-fg);border-radius:var(--radius-sm);
+  padding:12px;overflow:auto;white-space:pre-wrap;line-height:1.55;border:1px solid var(--border)}
+.send-row{display:flex;gap:8px;margin-top:10px}
+.send-row input{flex:1}
+code{background:var(--surface-3);padding:2px 6px;border-radius:5px;font-size:12px;
+  font-family:var(--mono);color:var(--text)}
+
+.help-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.help-item{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface)}
+.help-item h4{font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.help-item p{font-size:12.5px;color:var(--text-muted);line-height:1.8}
+.help-item code{font-size:11.5px;background:var(--surface-3)}
+
+.legend{display:flex;gap:16px;font-size:12px;color:var(--text-muted);margin-top:8px;align-items:center;flex-wrap:wrap}
+.legend i{width:12px;height:3px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle}
+.legend span{display:inline-flex;align-items:center}
+
+.seg{display:inline-flex;background:var(--surface-3);border:1px solid var(--border);
+  border-radius:10px;padding:3px;gap:2px;margin-bottom:12px}
+.seg-btn{border:none;background:transparent;color:var(--text-muted);font-size:13px;font-weight:700;
+  padding:7px 14px;border-radius:8px;cursor:pointer;min-height:36px;transition:all .15s}
+.seg-btn:hover{color:var(--text)}
+.seg-btn.active{background:var(--surface);color:var(--primary);box-shadow:var(--shadow-sm)}
+
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;
+  background:var(--primary-soft);color:var(--primary);border:1px solid var(--border-strong)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">🎯</div>
+      <div>
+        <div class="name">步进云台指挥中心</div>
+        <div class="sub">28BYJ-48 · Web Serial</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="navBar" aria-label="功能导航">
+      <div class="nav-group">控制</div>
+      <button class="active" data-tab="pos"><span class="ico">📍</span>位置控制</button>
+      <button data-tab="trace"><span class="ico">⬜</span>矩形循迹</button>
+      <div class="nav-group">调试</div>
+      <button data-tab="pid"><span class="ico">🎛️</span>PID 调参</button>
+      <button data-tab="k230"><span class="ico">🛰️</span>K230 追踪</button>
+      <div class="nav-group">系统</div>
+      <button data-tab="monitor"><span class="ico">📟</span>监视器</button>
+      <button data-tab="help"><span class="ico">❓</span>帮助</button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="conn-mini"><span class="dot" id="dotMini"></span><span id="miniStatus">未连接</span></div>
+      <button class="theme-toggle" id="btnTheme" aria-label="切换主题">
+        <span id="themeIco">🌙</span><span id="themeTxt">亮色</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ Content ============ -->
+  <main class="content">
+    <div class="topbar">
+      <h1 id="pageTitle">位置控制</h1>
+      <span class="mode-chip" id="modeChip" title="根据最后发出的指令推断">模式: —</span>
+      <div class="hud">
+        <div class="metric pan"><span class="mv" id="hudPan">0.0</span><span class="ml">PAN°</span></div>
+        <div class="metric tilt"><span class="mv" id="hudTilt">0.0</span><span class="ml">TILT°</span></div>
+        <div class="metric"><span class="mv" id="hudErr">0</span><span class="ml">误差</span></div>
+        <div class="metric"><span class="mv" id="hudOut">0.00</span><span class="ml">输出</span></div>
+      </div>
+      <span class="spacer"></span>
+      <span class="pill"><span class="dot" id="dotTop"></span><span id="connStatus">未连接</span></span>
+      <select id="baud" aria-label="波特率">
+        <option value="115200">115200</option><option value="9600">9600</option>
+      </select>
+      <button class="btn" id="btnConnect">🔗 连接</button>
+      <button class="btn ghost" id="btnDisconnect" disabled>断开</button>
+    </div>
+
+    <!-- ===== Tab: 位置控制 ===== -->
+    <section class="tab active" id="tab-pos">
+      <div class="grid2">
+        <div class="card">
+          <h3>🎯 目标位置</h3>
+          <div class="row"><label>Pan (°)</label><input id="panTarget" type="number" value="0" step="5" min="-180" max="180"><button class="btn sm" onclick="cmd('x'+v('panTarget'))">发送</button></div>
+          <div class="row"><label>Tilt (°)</label><input id="tiltTarget" type="number" value="0" step="5" min="-35" max="35"><button class="btn sm" onclick="cmd('y'+v('tiltTarget'))">发送</button></div>
+          <div class="row">
+            <button class="btn" onclick="cmd('z')">🔄 归零</button>
+            <button class="btn ghost" onclick="cmd('s')">⏹ 停止</button>
+            <button class="btn ghost" onclick="cmd('m')">📌 位置环</button>
+            <button class="btn ghost" onclick="cmd('k')">🛰️ K230</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>📡 实时瞄准雷达</h3>
+          <canvas id="radar"></canvas>
+          <div class="legend">
+            <span><i style="background:var(--danger)"></i>激光(误差偏移)</span>
+            <span><i style="background:var(--chart-axis)"></i>靶心(设定点)</span>
+          </div>
+          <p class="note">圆心为设定点，红点实时显示激光相对靶心的偏移。红点居中=已锁定；越靠外圈=偏差越大。配合下方数值与曲线定位追踪问题。</p>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:18px">
+        <div class="card">
+          <h3>📊 实时数据</h3>
+          <div class="val-row" id="liveValues">
+            <div class="val-item pan"><div class="num" id="lvPan">0.0</div><div class="lbl">Pan(°)</div></div>
+            <div class="val-item tilt"><div class="num" id="lvTilt">0.0</div><div class="lbl">Tilt(°)</div></div>
+            <div class="val-item"><div class="num" id="lvPerr">0</div><div class="lbl">Pan 误差</div></div>
+            <div class="val-item"><div class="num" id="lvTerr">0</div><div class="lbl">Tilt 误差</div></div>
+          </div>
+        </div>
+        <div class="card"><h3>📈 位置轨迹</h3><canvas id="posChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ===== Tab: 循迹测试 ===== -->
+    <section class="tab" id="tab-trace">
+      <div class="grid2">
+        <div class="card">
+          <h3>⬜ 矩形循迹</h3>
+          <div class="row"><label>大小(步)</label><input id="traceSize" type="number" value="300" min="50" max="2000"><span style="font-size:12px;color:var(--text-muted)">300≈±26°</span></div>
+          <div class="row">
+            <button class="btn success" onclick="cmd('trace '+v('traceSize'))">▶ 启动循迹</button>
+            <button class="btn danger" onclick="cmd('stop')">⏹ 停止</button>
+          </div>
+          <p class="note">云台以当前位置为中心画矩形，4 角自动切换，发送 <code>stop</code> 停止。追踪异常时先看「K230 追踪」页与雷达。</p>
+        </div>
+        <div class="card">
+          <h3>🔄 回程差测试</h3>
+          <div class="row"><label>Pan 回程</label><input id="blPan" type="number" value="50" min="0" max="200"><button class="btn sm" onclick="cmd('backlash p '+v('blPan'))">设置</button></div>
+          <div class="row"><label>Tilt 回程</label><input id="blTilt" type="number" value="50" min="0" max="200"><button class="btn sm" onclick="cmd('backlash t '+v('blTilt'))">设置</button></div>
+          <div class="row"><button class="btn ghost" onclick="cmd('backlash')">📖 当前值</button></div>
+          <p class="note">28BYJ-48 回程差典型 30~80 步。换向抖动就加大，转向迟钝就减小。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Tab: PID 调参 ===== -->
+    <section class="tab" id="tab-pid">
+      <div class="grid2">
+        <div class="card">
+          <h3>Pan 位置 PID</h3>
+          <div class="slider-row"><span class="lab">Kp</span><input type="range" min="0.00005" max="0.005" step="0.00005" value="0.0006" id="pkp"><span class="val" id="pkpV">0.00060</span><button class="btn sm" onclick="cmd('pid p kp '+v('pkp'))">↩</button></div>
+          <div class="slider-row"><span class="lab">Ki</span><input type="range" min="0" max="0.001" step="0.00001" value="0" id="pki"><span class="val" id="pkiV">0.00000</span><button class="btn sm" onclick="cmd('pid p ki '+v('pki'))">↩</button></div>
+          <div class="slider-row"><span class="lab">Kd</span><input type="range" min="0" max="0.0005" step="0.00001" value="0.00005" id="pkd"><span class="val" id="pkdV">0.00005</span><button class="btn sm" onclick="cmd('pid p kd '+v('pkd'))">↩</button></div>
+        </div>
+        <div class="card">
+          <h3>Tilt 位置 PID</h3>
+          <div class="slider-row"><span class="lab">Kp</span><input type="range" min="0.00005" max="0.005" step="0.00005" value="0.0006" id="tkp"><span class="val" id="tkpV">0.00060</span><button class="btn sm" onclick="cmd('pid t kp '+v('tkp'))">↩</button></div>
+          <div class="slider-row"><span class="lab">Ki</span><input type="range" min="0" max="0.001" step="0.00001" value="0" id="tki"><span class="val" id="tkiV">0.00000</span><button class="btn sm" onclick="cmd('pid t ki '+v('tki'))">↩</button></div>
+          <div class="slider-row"><span class="lab">Kd</span><input type="range" min="0" max="0.0005" step="0.00001" value="0.00005" id="tkd"><span class="val" id="tkdV">0.00005</span><button class="btn sm" onclick="cmd('pid t kd '+v('tkd'))">↩</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>📈 PID 响应曲线</h3>
+        <div class="seg" role="group" aria-label="曲线类型">
+          <button class="seg-btn active" data-pid="err" aria-pressed="true">误差 err</button>
+          <button class="seg-btn" data-pid="out" aria-pressed="false">输出 out</button>
+          <button class="seg-btn" data-pid="sp" aria-pressed="false">设定 vs 实际</button>
+        </div>
+        <div class="val-row" id="pidLive">
+          <div class="val-item pan"><div class="num" id="plErr">0</div><div class="lbl">Pan 误差</div></div>
+          <div class="val-item tilt"><div class="num" id="tlErr">0</div><div class="lbl">Tilt 误差</div></div>
+          <div class="val-item pan"><div class="num" id="plOut">0.00</div><div class="lbl">Pan 输出</div></div>
+          <div class="val-item tilt"><div class="num" id="tlOut">0.00</div><div class="lbl">Tilt 输出</div></div>
+        </div>
+        <canvas id="pidChart"></canvas>
+        <div class="legend" id="pidLegend"></div>
+      </div>
+      <div class="card">
+        <h3>💡 调参口诀</h3>
+        <p class="note" style="margin-top:0">
+          <code>Kp</code> 太小 → 追得慢 &nbsp;|&nbsp; <code>Kp</code> 太大 → 抖动过冲<br>
+          <code>Ki</code> 消除静差（一般 0）&nbsp;|&nbsp; <code>Kd</code> 抑制过冲（微调）<br>
+          先调 <code>Kp</code> 到接近目标不抖，再加 <code>Kd</code> 消过冲。
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== Tab: K230 ===== -->
+    <section class="tab" id="tab-k230">
+      <div class="grid2">
+        <div class="card">
+          <h3>🛰️ K230 自动追踪</h3>
+          <div class="row"><button class="btn success" onclick="cmd('k')">▶ 切到自动追踪</button><button class="btn ghost" onclick="cmd('m')">⏹ 切回位置环</button></div>
+          <p class="note">发 <code>k</code> 切换 AUTO 模式，K230 视觉发误差驱动云台。监视器查看 <code>KF/err</code> 值。若误检率高，已在固件端加误差跳变保护 + 视觉端空间一致性双重防偏。</p>
+          <div class="row" style="margin-top:8px"><span class="tag">抗误检</span><span class="tag">帧率优化</span><span class="tag">防过偏</span></div>
+        </div>
+        <div class="card">
+          <h3>🔧 K230 PID (速度环)</h3>
+          <div class="slider-row"><span class="lab">Kp</span><input type="range" min="0.1" max="3" step="0.1" value="1" id="kp230"><span class="val" id="kp230V">1.0</span><button class="btn sm" onclick="cmd('g p kp '+v('kp230'))">↩</button></div>
+          <div class="slider-row"><span class="lab">减速区</span><input type="range" min="10" max="120" step="5" value="35" id="dz230"><span class="val" id="dz230V">35</span><button class="btn sm" onclick="cmd('g p ki '+v('dz230'))">↩</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Tab: 监视器 ===== -->
+    <section class="tab" id="tab-monitor">
+      <div class="card">
+        <div class="row">
+          <button class="btn ghost sm" id="btnClearTerm">🧹 清屏</button>
+          <label class="row" style="margin:0"><input type="checkbox" id="autoscroll" checked style="width:auto;min-width:auto;accent-color:var(--primary)"> 自动滚动</label>
+          <span style="font-size:12px;color:var(--text-muted)">显示串口收到的所有数据</span>
+        </div>
+        <div id="term">等待串口连接…</div>
+        <div class="send-row">
+          <input id="cmdInput" placeholder="输入命令，回车发送（↑/↓ 翻历史）" aria-label="命令输入">
+          <button class="btn" onclick="sendCmd()">发送</button>
+          <select id="cmdPreset" aria-label="常用命令">
+            <option value="">📋 常用命令</option>
+            <option value="?">? 状态</option>
+            <option value="z">z 归零</option>
+            <option value="s">s 停止</option>
+            <option value="k">k 切 K230</option>
+            <option value="m">m 切位置环</option>
+            <option value="trace 300">trace 300 循迹</option>
+            <option value="backlash">backlash 查回程</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Tab: 帮助 ===== -->
+    <section class="tab" id="tab-help">
+      <h3 style="margin-bottom:14px;font-size:16px">📖 命令手册</h3>
+      <div class="help-grid">
+        <div class="help-item"><h4>📍 位置控制</h4><p><code>x90</code> Pan 到 90°<br><code>y30</code> Tilt 到 30°<br><code>z</code> 归零<br><code>s</code> 停止</p></div>
+        <div class="help-item"><h4>🎛️ PID 调参</h4><p><code>pid p kp 0.001</code><br><code>pid t ki 0.00001</code><br><code>pid p kd 0.00005</code></p></div>
+        <div class="help-item"><h4>⬜ 循迹测试</h4><p><code>trace 300</code> 启动<br><code>stop</code> 停止<br>云台画矩形测试流畅度</p></div>
+        <div class="help-item"><h4>🔄 回程差</h4><p><code>backlash p 50</code><br><code>backlash t 30</code><br><code>backlash</code> 查当前值</p></div>
+        <div class="help-item"><h4>🛰️ K230</h4><p><code>k</code> 切换自动追踪<br><code>m</code> 切回位置环<br><code>g p kp 1.0</code> 调速度环</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// UI helpers
+// ============================================================
+const $=id=>document.getElementById(id);
+// FIX: 旧版写死 $('id') 导致所有控件值一律读成 0，位置/滑块指令全部失效
+const v=id=>{const el=document.getElementById(id);return el?el.value:0;};
+
+const PAGE_TITLES={pos:'位置控制',trace:'循迹测试',pid:'PID 调参',k230:'K230 追踪',monitor:'监视器',help:'帮助'};
+
+// ---- Theme ----
+const themeIco=$('themeIco'),themeTxt=$('themeTxt');
+function applyTheme(t){
+  document.documentElement.dataset.theme=t;
+  const dark=t==='dark';
+  themeIco.textContent=dark?'☀️':'🌙';
+  themeTxt.textContent=dark?'亮色':'暗色';
+  try{localStorage.setItem('gimbal-theme',t)}catch(e){}
+}
+(function initTheme(){
+  let t='dark';
+  try{t=localStorage.getItem('gimbal-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')}catch(e){}
+  applyTheme(t);
+})();
+$('btnTheme').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+
+// ---- Tabs ----
+const navButtons=document.querySelectorAll('#navBar button');
+navButtons.forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    navButtons.forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    const tab=btn.dataset.tab;
+    $('tab-'+tab).classList.add('active');
+    $('pageTitle').textContent=PAGE_TITLES[tab]||'';
+  });
+});
+
+// ---- Slider display ----
+function decimalsOf(step){const i=step.indexOf('.');return i>=0?(step.split('.')[1].length):0;}
+document.querySelectorAll('input[type=range]').forEach(sl=>{
+  const dv=document.getElementById(sl.id+'V');
+  if(dv){const d=decimalsOf(sl.step);
+    const render=()=>dv.textContent=parseFloat(sl.value).toFixed(d);
+    sl.addEventListener('input',render);render();}
+});
+
+// ---- Preset command ----
+$('cmdPreset').addEventListener('change',function(){
+  if(this.value){$('cmdInput').value=this.value;sendCmdText(this.value);}
+  this.value='';
+});
+
+// ============================================================
+// Serial
+// ============================================================
+let port,reader;
+let connecting=false,disconnecting=false;   // 防重入: 避免 open()/close() 并发导致的 "already in progress"
+const term=$('term');
+let cmdHistory=[],histIdx=-1;
+
+function log(msg){
+  if(term.textContent==='等待串口连接…')term.textContent='';
+  term.textContent+=msg+'\n';
+  if($('autoscroll').checked)term.scrollTop=term.scrollHeight;
+}
+function setConn(on,baud){
+  $('btnConnect').disabled=on;
+  $('btnDisconnect').disabled=!on;
+  const s=on?'已连接':'未连接';
+  $('connStatus').textContent=on?`已连接 ${baud}`:s;
+  $('miniStatus').textContent=s;
+  $('dotTop').classList.toggle('on',on);
+  $('dotMini').classList.toggle('on',on);
+}
+async function connect(){
+  if(connecting||disconnecting)return;        // 防重入: 上一 open() 未结束前不再调用
+  if(port&&port.readable)return;              // 已连接, 不重复开
+  connecting=true;
+  $('btnConnect').disabled=true;              // 连接中禁用按钮, 防止连点触发并发 open()
+  try{
+    if(!('serial'in navigator)){log('❌ 此浏览器不支持 Web Serial（请用 Chrome/Edge）');return;}
+    port=await navigator.serial.requestPort();
+    const baud=parseInt($('baud').value,10);
+    await port.open({baudRate:baud});
+    setConn(true,baud);
+    log(`✅ 已连接 ${baud} baud`);
+    reader=port.readable.getReader();
+    readLoop();
+  }catch(e){
+    log(`❌ 连接失败: ${e.message}`);
+    // 清理半开状态, 允许下次重试 (否则端口卡在 opening 态, 再连必报 "already in progress")
+    try{if(port)await port.close();}catch(_){}
+    port=null;reader=null;
+    setConn(false);
+  }finally{
+    connecting=false;
+    $('btnConnect').disabled=false;
+  }
+}
+async function readLoop(){
+  if(!port||!port.readable)return;
+  try{
+    while(true){
+      const {value,done}=await reader.read();
+      if(done)break;
+      const s=new TextDecoder().decode(value);
+      term.textContent+=s;
+      if($('autoscroll').checked)term.scrollTop=term.scrollHeight;
+      parseTelemetry(s);
+      if(term.textContent.length>6000)term.textContent=term.textContent.slice(-4000);
+    }
+  }catch(e){
+    if(e.message!=='The reader was cancelled.')log(`⚠️ 读取错误: ${e.message}`);
+  }finally{
+    try{reader.releaseLock();}catch(_){}
+    // 仅在未主动断开且端口仍可读时续接 reader; 断开时不再抢占, 让 close() 能成功
+    if(port&&port.readable&&!disconnecting)reader=port.readable.getReader();
+    else reader=null;
+  }
+}
+function parseTelemetry(s){
+  // POS,panA,panTarget,panErr,panOut,tiltA,tiltTarget,tiltErr,tiltOut
+  const m=s.match(/POS,([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+)/);
+  if(m){
+    $('lvPan').textContent=parseFloat(m[1]).toFixed(1);
+    $('lvTilt').textContent=parseFloat(m[5]).toFixed(1);
+    $('lvPerr').textContent=parseFloat(m[3]).toFixed(0);
+    $('lvTerr').textContent=parseFloat(m[7]).toFixed(0);
+    // 常驻 HUD
+    $('hudPan').textContent=parseFloat(m[1]).toFixed(1);
+    $('hudTilt').textContent=parseFloat(m[5]).toFixed(1);
+    $('hudErr').textContent=Math.round(Math.hypot(parseFloat(m[3]),parseFloat(m[7])));
+    $('hudOut').textContent=parseFloat(m[4]).toFixed(2);
+    // 雷达: 记录最新误差
+    lastErr.pan=parseFloat(m[3]);
+    lastErr.tilt=parseFloat(m[7]);
+    updatePosChart(m);
+    updatePidChart(m);
+    drawRadar();
+  }
+}
+async function disconnect(){
+  if(disconnecting)return;
+  disconnecting=true;
+  try{if(reader)await reader.cancel();}catch(e){}
+  try{
+    if(port){
+      // 等 readLoop 的 finally 释放 reader 锁, 否则 close() 会因 reader 仍占用而失败
+      await new Promise(r=>setTimeout(r,60));
+      await port.close();
+    }
+  }catch(e){log(`⚠️ 断开时: ${e.message}`);}
+  finally{
+    port=null;reader=null;disconnecting=false;
+    setConn(false);
+    log('⏹ 已断开');
+  }
+}
+function cmd(text){sendCmdText(text);}
+function sendCmdText(text){
+  if(!port){log('❌ 请先连接串口');return;}
+  const writer=port.writable.getWriter();
+  writer.write(new TextEncoder().encode(text+'\n'));
+  writer.releaseLock();
+  log(`> ${text}`);
+  inferMode(text);
+}
+// 根据最后发出的指令推断当前模式，给出可视化反馈（不依赖固件回传）
+function inferMode(text){
+  const t=text.trim().toLowerCase();
+  let mode='—';
+  if(t==='k')mode='AUTO (K230)';
+  else if(t==='m')mode='位置环';
+  else if(t.startsWith('trace'))mode='矩形循迹';
+  else if(t==='z'||t.startsWith('x')||t.startsWith('y'))mode='位置环';
+  if(mode!=='—')$('modeChip').textContent='模式: '+mode;
+}
+function sendCmd(){
+  const inp=$('cmdInput');
+  const val=inp.value.trim();
+  if(val){sendCmdText(val);cmdHistory.push(val);histIdx=cmdHistory.length;}
+  inp.value='';
+}
+$('cmdInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){sendCmd();return;}
+  if(e.key==='ArrowUp'){if(cmdHistory.length){histIdx=Math.max(0,histIdx-1);$('cmdInput').value=cmdHistory[histIdx];e.preventDefault();}}
+  if(e.key==='ArrowDown'){if(cmdHistory.length){histIdx=Math.min(cmdHistory.length,histIdx+1);$('cmdInput').value=cmdHistory[histIdx]||'';e.preventDefault();}}
+});
+$('btnConnect').addEventListener('click',connect);
+$('btnDisconnect').addEventListener('click',disconnect);
+$('btnClearTerm').addEventListener('click',()=>{term.textContent='串口已清屏\n';});
+
+// ============================================================
+// Charts (HiDPI + 坐标轴标注) — 位置轨迹 + PID 响应曲线
+// ============================================================
+function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+
+// 通用绘制助手
+function drawHGrid(c,padL,w,padR,plotH,padT,maxV,yOf){
+  const grid=cssVar('--chart-grid'),axis=cssVar('--chart-axis');
+  c.strokeStyle=grid;c.lineWidth=1;c.fillStyle=axis;c.font='10px '+cssVar('--font');c.textBaseline='middle';
+  [maxV,maxV/2,0,-maxV/2,-maxV].forEach(val=>{
+    const y=yOf(val);c.beginPath();c.moveTo(padL,y);c.lineTo(w-padR,y);c.stroke();
+    c.textAlign='right';c.fillText(val.toFixed(0),padL-5,y);
+  });
+}
+function plotLine(c,arr,xOf,yOf,len,color,opt){
+  opt=opt||{};
+  c.save();
+  if(opt.dashed)c.setLineDash([4,4]);
+  c.strokeStyle=color;c.lineWidth=2;c.lineJoin='round';
+  c.beginPath();
+  arr.forEach((val,i)=>{const x=xOf(i),y=yOf(val);i?c.lineTo(x,y):c.moveTo(x,y);});
+  c.stroke();
+  c.restore();
+  if(opt.dot){const lx=xOf(len-1),ly=yOf(arr[len-1]);c.fillStyle=color;c.beginPath();c.arc(lx,ly,3,0,Math.PI*2);c.fill();}
+}
+
+// ---- Pos chart (实际角) ----
+const posCanvas=$('posChart'),posCtx=posCanvas.getContext('2d');
+const posData={pan:[],tilt:[],maxPoints:80};
+function updatePosChart(m){
+  posData.pan.push(parseFloat(m[1]));
+  posData.tilt.push(parseFloat(m[5]));
+  if(posData.pan.length>posData.maxPoints){posData.pan.shift();posData.tilt.shift();}
+  drawPosChart();
+}
+function drawPosChart(){
+  const w=posCanvas.clientWidth,h=posCanvas.clientHeight;
+  if(!w||!h)return;
+  posCtx.clearRect(0,0,w,h);
+  const panC=cssVar('--danger'),tiltC=cssVar('--primary'),muted=cssVar('--text-muted');
+  const padL=34,padR=10,padT=10,padB=18,plotW=w-padL-padR,plotH=h-padT-padB;
+  const len=posData.pan.length;
+  const maxV=Math.max(10,...posData.pan.map(Math.abs),...posData.tilt.map(Math.abs));
+  const yOf=v=>padT+plotH/2-(v/maxV)*(plotH/2);
+  drawHGrid(posCtx,padL,w,padR,plotH,padT,maxV,yOf);
+  if(len>=2){
+    const xOf=i=>padL+(i/(len-1))*plotW;
+    plotLine(posCtx,posData.tilt,xOf,yOf,len,tiltC,{dot:true});
+    plotLine(posCtx,posData.pan,xOf,yOf,len,panC,{dot:true});
+  }else{
+    posCtx.fillStyle=muted;posCtx.textAlign='center';posCtx.textBaseline='middle';
+    posCtx.fillText('等待 POS 遥测…',w/2,h/2);
+  }
+}
+
+// ---- PID chart (误差 / 输出 / 设定vs实际) ----
+const pidCanvas=$('pidChart'),pidCtx=pidCanvas.getContext('2d');
+let pidChannel='err';
+const pidData={panErr:[],tiltErr:[],panOut:[],tiltOut:[],panSp:[],tiltSp:[],panAct:[],tiltAct:[],maxPoints:120};
+function updatePidChart(m){
+  // POS,panA,panTarget,panErr,panOut,tiltA,tiltTarget,tiltErr,tiltOut
+  pidData.panErr.push(parseFloat(m[3]));  pidData.tiltErr.push(parseFloat(m[7]));
+  pidData.panOut.push(parseFloat(m[4]));  pidData.tiltOut.push(parseFloat(m[8]));
+  pidData.panSp.push(parseFloat(m[2]));   pidData.tiltSp.push(parseFloat(m[6]));
+  pidData.panAct.push(parseFloat(m[1]));  pidData.tiltAct.push(parseFloat(m[5]));
+  for(const k in pidData){
+    if(Array.isArray(pidData[k]) && pidData[k].length>pidData.maxPoints) pidData[k].shift();
+  }
+  drawPidChart();
+  updatePidReadout();
+}
+function updatePidReadout(){
+  const last=a=>a.length?a[a.length-1]:0;
+  $('plErr').textContent=last(pidData.panErr).toFixed(0);
+  $('tlErr').textContent=last(pidData.tiltErr).toFixed(0);
+  $('plOut').textContent=last(pidData.panOut).toFixed(2);
+  $('tlOut').textContent=last(pidData.tiltOut).toFixed(2);
+}
+function drawPidChart(){
+  const w=pidCanvas.clientWidth,h=pidCanvas.clientHeight;
+  if(!w||!h)return;
+  pidCtx.clearRect(0,0,w,h);
+  const panC=cssVar('--danger'),tiltC=cssVar('--primary'),muted=cssVar('--text-muted');
+  const padL=40,padR=10,padT=12,padB=18,plotW=w-padL-padR,plotH=h-padT-padB;
+  const len=pidData.panErr.length;
+  let maxV;
+  if(pidChannel==='out')      maxV=Math.max(1,...pidData.panOut.map(Math.abs),...pidData.tiltOut.map(Math.abs));
+  else if(pidChannel==='sp')  maxV=Math.max(10,...pidData.panAct.map(Math.abs),...pidData.tiltAct.map(Math.abs),...pidData.panSp.map(Math.abs),...pidData.tiltSp.map(Math.abs));
+  else                        maxV=Math.max(5,...pidData.panErr.map(Math.abs),...pidData.tiltErr.map(Math.abs));
+  const yOf=v=>padT+plotH/2-(v/maxV)*(plotH/2);
+  drawHGrid(pidCtx,padL,w,padR,plotH,padT,maxV,yOf);
+  if(len>=2){
+    const xOf=i=>padL+(i/(len-1))*plotW;
+    if(pidChannel==='out'){
+      plotLine(pidCtx,pidData.panOut,xOf,yOf,len,panC,{dot:true});
+      plotLine(pidCtx,pidData.tiltOut,xOf,yOf,len,tiltC,{dot:true});
+    }else if(pidChannel==='sp'){
+      plotLine(pidCtx,pidData.panSp,xOf,yOf,len,panC,{dashed:true});
+      plotLine(pidCtx,pidData.panAct,xOf,yOf,len,panC,{dot:true});
+      plotLine(pidCtx,pidData.tiltSp,xOf,yOf,len,tiltC,{dashed:true});
+      plotLine(pidCtx,pidData.tiltAct,xOf,yOf,len,tiltC,{dot:true});
+    }else{
+      plotLine(pidCtx,pidData.panErr,xOf,yOf,len,panC,{dot:true});
+      plotLine(pidCtx,pidData.tiltErr,xOf,yOf,len,tiltC,{dot:true});
+    }
+  }else{
+    pidCtx.fillStyle=muted;pidCtx.textAlign='center';pidCtx.textBaseline='middle';
+    pidCtx.fillText('等待 POS 遥测…',w/2,h/2);
+  }
+}
+function renderPidLegend(){
+  const el=$('pidLegend');
+  if(pidChannel==='out')
+    el.innerHTML='<span><i style="background:var(--danger)"></i>Pan 输出</span><span><i style="background:var(--primary)"></i>Tilt 输出</span>';
+  else if(pidChannel==='sp')
+    el.innerHTML='<span><i style="background:var(--danger)"></i>Pan 实际</span><span><i style="background:var(--danger);opacity:.5"></i>Pan 设定(虚)</span><span><i style="background:var(--primary)"></i>Tilt 实际</span><span><i style="background:var(--primary);opacity:.5"></i>Tilt 设定(虚)</span>';
+  else
+    el.innerHTML='<span><i style="background:var(--danger)"></i>Pan 误差</span><span><i style="background:var(--primary)"></i>Tilt 误差</span>';
+}
+// segmented control
+document.querySelectorAll('.seg-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.seg-btn').forEach(b=>{b.classList.remove('active');b.setAttribute('aria-pressed','false');});
+    btn.classList.add('active');btn.setAttribute('aria-pressed','true');
+    pidChannel=btn.dataset.pid;
+    renderPidLegend();
+    drawPidChart();
+  });
+});
+
+// ---- 实时瞄准雷达 (误差偏移可视化) ----
+const radarCanvas=$('radar'),radarCtx=radarCanvas.getContext('2d');
+const lastErr={pan:0,tilt:0};
+function drawRadar(){
+  const w=radarCanvas.clientWidth,h=radarCanvas.clientHeight;
+  if(!w||!h)return;
+  radarCtx.clearRect(0,0,w,h);
+  const cx=w/2,cy=h/2,R=Math.min(w,h)/2-18;
+  const grid=cssVar('--chart-grid'),axis=cssVar('--chart-axis'),
+        panC=cssVar('--danger'),successC=cssVar('--success'),warnC=cssVar('--warning');
+  // 同心环
+  radarCtx.strokeStyle=grid;radarCtx.lineWidth=1;
+  [0.33,0.66,1].forEach(f=>{radarCtx.beginPath();radarCtx.arc(cx,cy,R*f,0,Math.PI*2);radarCtx.stroke();});
+  // 十字准星
+  radarCtx.beginPath();radarCtx.moveTo(cx-R,cy);radarCtx.lineTo(cx+R,cy);
+  radarCtx.moveTo(cx,cy-R);radarCtx.lineTo(cx,cy+R);radarCtx.stroke();
+  // 误差 -> 偏移 (±200px 映射到半径 R)
+  const SCALE=R/200;
+  const ex=lastErr.pan*SCALE, ey=-lastErr.tilt*SCALE;   // 屏幕 y 向上为正
+  const lx=cx+ex, ly=cy+ey;
+  // 设定点(靶心)
+  radarCtx.fillStyle=axis;radarCtx.beginPath();radarCtx.arc(cx,cy,3,0,Math.PI*2);radarCtx.fill();
+  // 连线
+  radarCtx.save();radarCtx.globalAlpha=0.5;radarCtx.strokeStyle=panC;radarCtx.lineWidth=1.5;
+  radarCtx.beginPath();radarCtx.moveTo(cx,cy);radarCtx.lineTo(lx,ly);radarCtx.stroke();radarCtx.restore();
+  // 激光点(辉光)
+  const mag=Math.hypot(lastErr.pan,lastErr.tilt);
+  const dotC=mag<8?successC:(mag<40?warnC:panC);
+  radarCtx.save();radarCtx.shadowColor=dotC;radarCtx.shadowBlur=14;
+  radarCtx.fillStyle=dotC;radarCtx.beginPath();radarCtx.arc(lx,ly,7,0,Math.PI*2);radarCtx.fill();
+  radarCtx.restore();
+  // 锁定质量
+  radarCtx.fillStyle=dotC;radarCtx.font='600 12px '+cssVar('--font');radarCtx.textAlign='center';
+  radarCtx.fillText(mag<8?'● 已锁定':(mag<40?'○ 跟踪中':'✕ 偏差大'),cx,cy-R-6);
+}
+
+// ---- generic fit / resize ----
+function fitCanvas(canvas,ctx,drawFn){
+  const dpr=window.devicePixelRatio||1;
+  const r=canvas.getBoundingClientRect();
+  canvas.width=Math.max(1,r.width*dpr);
+  canvas.height=Math.max(1,r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  drawFn();
+}
+function resizeAll(){
+  fitCanvas(posCanvas,posCtx,drawPosChart);
+  fitCanvas(pidCanvas,pidCtx,drawPidChart);
+  fitCanvas(radarCanvas,radarCtx,drawRadar);
+}
+window.addEventListener('resize',resizeAll);
+if(window.ResizeObserver){
+  const ro=new ResizeObserver(resizeAll);
+  ro.observe(posCanvas);ro.observe(pidCanvas);ro.observe(radarCanvas);
+}
+renderPidLegend();
+resizeAll();
+
+// ---- Init banner ----
+log('🔌 点击右上「连接」选择 CH340 串口 (115200)');
+log('📋 左侧切换功能页面 · 右上角可切换亮/暗主题');
+</script>
+</body>
+</html>
