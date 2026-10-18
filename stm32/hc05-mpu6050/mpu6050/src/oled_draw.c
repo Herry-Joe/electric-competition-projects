@@ -273,12 +273,13 @@ void OLED_Draw_Rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h)
  *========================================*/
 static void clear_area(uint8_t x, uint8_t y, uint8_t w, uint8_t h)
 {
-    uint8_t col, py;
+    uint16_t col;
+    uint8_t py;
     uint8_t page_start = y >> 3;
     uint8_t page_end = (y + h - 1) >> 3;
     uint16_t col_end = (uint16_t)x + (uint16_t)w;
     for (py = page_start; py <= page_end; py++)
-        for (col = x; col < 128 && (uint16_t)col < col_end; col++)
+        for (col = x; col < 128 && col < col_end; col++)
             fb[col + py * 128] = 0;
 }
 
