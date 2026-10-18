@@ -1,0 +1,14 @@
+# WorkBuddy 本地助手数据 (非项目源码)
+.workbuddy/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 运行时校准 (由 Save 按钮生成到 SD 卡, 不应入库; 出厂默认见 config/threshold_default.json)
+config/threshold_config.json
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+*.bak

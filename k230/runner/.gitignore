@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+APP/
+Photos/
+main_backup.py
+Fonts/*.bin
+Fonts/*.ttf
+Fonts/*.fnt
+!Fonts/README.md

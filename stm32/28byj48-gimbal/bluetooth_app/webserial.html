@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>云台遥控 · Web Serial</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --card: #151b2e;
+    --accent: #00e5ff;
+    --accent2: #b14bff;
+    --ok: #00ff88;
+    --err: #ff4d6d;
+    --text: #e8edf5;
+    --muted: #8a94a8;
+    --btn-bg: rgba(0,229,255,0.08);
+    --btn-border: rgba(0,229,255,0.2);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 12px; max-width: 480px; margin: 0 auto;
+    user-select: none; padding-bottom: 40px;
+  }
+  h1 { font-size: 17px; margin: 2px 0 10px; text-align: center; letter-spacing: 1px; }
+  h1 span { background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card {
+    background: var(--card); border-radius: 14px; padding: 12px;
+    margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 3px 16px rgba(0,0,0,0.3);
+  }
+  .row { display: flex; gap: 6px; }
+  .row .btn { flex: 1; }
+  .btn {
+    background: var(--btn-bg); border: 1px solid var(--btn-border);
+    color: var(--text); border-radius: 10px; padding: 12px 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: transform .06s, box-shadow .1s; text-align: center;
+  }
+  .btn:active { transform: scale(0.93); }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; color: #061018;
+  }
+  .btn.small { padding: 8px 4px; font-size: 12px; }
+  .btn.danger { border-color: var(--err); color: var(--err); }
+  .btn.dance {
+    background: linear-gradient(135deg, #ff6ec4, #7873f5);
+    border: none; color: #fff; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.75} }
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    max-width: 200px; margin: 0 auto; }
+  .pad .btn { aspect-ratio: 1; display: flex; align-items: center;
+    justify-content: center; font-size: 20px; }
+  .pad .empty { visibility: hidden; }
+  .status-bar {
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap; gap: 6px 12px; font-size: 13px; margin-bottom: 6px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%;
+    background: var(--err); box-shadow: 0 0 6px var(--err);
+    display: inline-block; flex-shrink: 0;
+  }
+  .dot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .port-info { font-size: 11px; color: var(--muted); }
+  .section-title {
+    font-size: 12px; color: var(--muted); margin: 0 0 8px 2px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .section-title .badge {
+    background: rgba(0,229,255,0.15); color: var(--accent);
+    padding: 1px 8px; border-radius: 8px; font-size: 10px;
+  }
+  .slider-wrap { display: flex; align-items: center; gap: 8px; }
+  input[type=range] { flex: 1; accent-color: var(--accent);
+    height: 6px; border-radius: 3px; }
+  .speed-val {
+    font-variant-numeric: tabular-nums; min-width: 52px;
+    text-align: right; color: var(--accent); font-weight: 600;
+    font-size: 13px;
+  }
+  .term {
+    background: #060a14; border-radius: 10px; padding: 8px; height: 130px;
+    overflow-y: auto; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 11px; line-height: 1.5; white-space: pre-wrap;
+  }
+  .term::-webkit-scrollbar { width: 4px; }
+  .term::-webkit-scrollbar-thumb { background: var(--card); border-radius: 2px; }
+  .cmd-row { display: flex; gap: 6px; margin-top: 8px; }
+  .cmd-row input {
+    flex: 1; background: #060a14; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 0 12px; color: var(--text);
+    font-family: monospace; font-size: 13px; outline: none;
+  }
+  .cmd-row input:focus { border-color: var(--accent); }
+  .cmd-row input::placeholder { color: var(--muted); }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 5px; text-align: center; line-height: 1.5; }
+  .axis-indicator {
+    display: flex; justify-content: center; gap: 10px; margin-bottom: 8px;
+  }
+  .axis-indicator span {
+    padding: 3px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    background: rgba(255,255,255,0.04);
+  }
+  .axis-indicator .active {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #061018;
+  }
+  .kbd-hint { font-size: 10px; color: var(--muted); margin-top: 4px; text-align: center; }
+
+  @media (max-width: 360px) {
+    body { padding: 8px; }
+    .btn { padding: 10px 4px; font-size: 13px; }
+    .pad .btn { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🎮 云台<span>遥控</span> · Web Serial</h1>
+
+<!-- 连接面板 -->
+<div class="card">
+  <div class="status-bar">
+    <div class="dot" id="dot"></div>
+    <span id="statusText">未连接</span>
+    <span class="port-info" id="portInfo"></span>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="connectBtn">🔗 连接</button>
+    <button class="btn danger" id="disconnectBtn" style="display:none">断开</button>
+  </div>
+  <div class="hint">
+    电脑蓝牙配对 <b>JDY-31</b>（密码 1234），设备管理器出现 COM 口后点"连接"。
+    也支持 USB 串口（115200bps）。
+  </div>
+</div>
+
+<!-- 当前轴状态 -->
+<div class="card">
+  <div class="axis-indicator">
+    <span id="axisPan" class="active">水平 (Pan)</span>
+    <span id="axisTilt">俯仰 (Tilt)</span>
+  </div>
+  <div class="pad">
+    <div class="empty"></div>
+    <button class="btn" data-cmd="t r5">↑</button>
+    <div class="empty"></div>
+    <button class="btn" data-cmd="p a">←</button>
+    <button class="btn" data-cmd="s">■</button>
+    <button class="btn" data-cmd="p c">→</button>
+    <div class="empty"></div>
+    <button class="btn" data-cmd="t r-5">↓</button>
+    <div class="empty"></div>
+  </div>
+  <div class="kbd-hint">键盘 ↑↓← → 方向 · Space 停止 · 1-9 调速度</div>
+</div>
+
+<!-- 速度 -->
+<div class="card">
+  <div class="section-title">速度 <span class="badge">vN 命令</span></div>
+  <div class="slider-wrap">
+    <span style="font-size:12px;color:var(--muted)">慢</span>
+    <input type="range" id="speed" min="1300" max="10000" value="3000" step="100">
+    <span class="speed-val" id="speedVal">3000µs</span>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="btn small" data-cmd="p c">▶ 正转</button>
+    <button class="btn small" data-cmd="p a">◀ 反转</button>
+    <button class="btn small" data-cmd="s">⏹ 停止</button>
+  </div>
+</div>
+
+<!-- 命令面板 -->
+<div class="card">
+  <div class="section-title">快速命令</div>
+  <div class="row">
+    <button class="btn small" data-cmd="p">选水平</button>
+    <button class="btn small" data-cmd="t">选俯仰</button>
+    <button class="btn small" data-cmd="h">半步</button>
+    <button class="btn small" data-cmd="f">全步</button>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <button class="btn small" data-cmd="r90">转 90°</button>
+    <button class="btn small" data-cmd="r45">转 45°</button>
+    <button class="btn small" data-cmd="r10">转 10°</button>
+    <button class="btn small" data-cmd="p w90">扫描</button>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <button class="btn small" data-cmd="+100">+100 步</button>
+    <button class="btn small" data-cmd="-100">-100 步</button>
+    <button class="btn small" data-cmd="?">查询状态</button>
+  </div>
+  <button class="btn dance" id="danceBtn" style="width:100%;margin-top:8px">💃 跳舞！</button>
+</div>
+
+<!-- 串口回显 + 自定义命令 -->
+<div class="card">
+  <div class="section-title">串口回显 <span class="badge" id="echoCount">0</span></div>
+  <div class="term" id="term"></div>
+  <div class="cmd-row">
+    <input type="text" id="cmdInput" placeholder="输入自定义命令…" spellcheck="false">
+    <button class="btn small primary" id="sendCmdBtn">发送</button>
+    <button class="btn small danger" id="clearBtn">清空</button>
+  </div>
+</div>
+
+<script>
+/* ===== Web Serial API ===== */
+let port = null;
+let reader = null;
+let keepReading = false;
+let lastSel = 'p';                     // 当前选中轴 (p/t)
+
+const BAUD = 9600;
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+const $ = id => document.getElementById(id);
+const dot = $('dot');
+const statusText = $('statusText');
+const portInfo = $('portInfo');
+const connectBtn = $('connectBtn');
+const disconnectBtn = $('disconnectBtn');
+const term = $('term');
+const cmdInput = $('cmdInput');
+const echoCount = $('echoCount');
+const speed = $('speed');
+const speedVal = $('speedVal');
+const axisPan = $('axisPan');
+const axisTilt = $('axisTilt');
+
+let lineCount = 0;
+
+/* ---- 日志 ---- */
+function log(msg, color) {
+  const line = document.createElement('div');
+  // 着色: # OK → 绿, # ERR → 红, » 发送 → 青
+  if (msg.startsWith('# OK')) {
+    line.innerHTML = '<span style="color:var(--ok)">' + escapeHtml(msg) + '</span>';
+  } else if (msg.startsWith('# ERR')) {
+    line.innerHTML = '<span style="color:var(--err)">' + escapeHtml(msg) + '</span>';
+  } else if (msg.startsWith('»')) {
+    line.innerHTML = '<span style="color:var(--accent)">' + escapeHtml(msg) + '</span>';
+  } else {
+    line.textContent = msg;
+    if (color) line.style.color = color;
+  }
+  term.appendChild(line);
+  term.scrollTop = term.scrollHeight;
+  lineCount++;
+  echoCount.textContent = lineCount;
+  while (term.childNodes.length > 200) {
+    term.removeChild(term.firstChild);
+    lineCount--;
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ---- 连接状态 ---- */
+function setConnected(on) {
+  dot.classList.toggle('on', on);
+  statusText.textContent = on ? '已连接' : '未连接';
+  connectBtn.style.display = on ? 'none' : 'block';
+  disconnectBtn.style.display = on ? 'block' : 'none';
+}
+
+/* ---- 选中轴 UI ---- */
+function setActiveAxis(axis) {
+  if (axis === 'p') {
+    axisPan.className = 'active';
+    axisTilt.className = '';
+    lastSel = 'p';
+  } else {
+    axisPan.className = '';
+    axisTilt.className = 'active';
+    lastSel = 't';
+  }
+}
+
+/* ---- 连接 ---- */
+async function connect() {
+  if (!('serial' in navigator)) {
+    log('⚠️ 浏览器不支持 Web Serial API', '#ff4d6d');
+    log('请用 Chrome / Edge 打开', '#ff4d6d');
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    const info = port.getInfo();
+    portInfo.textContent = info.usbProductId
+      ? `USB 0x${info.usbVendorId.toString(16)}:0x${info.usbProductId.toString(16)}`
+      : '';
+    await port.open({ baudRate: BAUD });
+    log('串口已打开 @ ' + BAUD + ' bps ✓', '#00ff88');
+    setConnected(true);
+    keepReading = true;
+    readLoop();
+  } catch (e) {
+    log('连接失败: ' + e.message, '#ff4d6d');
+    port = null;
+  }
+}
+
+/* ---- 读取 ---- */
+async function readLoop() {
+  while (port && port.readable && keepReading) {
+    reader = port.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const str = dec.decode(value);
+        str.split('\n').forEach(l => {
+          const t = l.trim();
+          if (t) log(t);
+        });
+      }
+    } catch (e) {
+      if (keepReading) log('读取错误: ' + e.message, '#ff4d6d');
+    } finally {
+      try { reader.releaseLock(); } catch (_) {}
+    }
+  }
+}
+
+/* ---- 发送 ---- */
+async function send(cmd) {
+  if (!port || !port.writable) {
+    log('⚠️ 未连接', '#ff4d6d');
+    return;
+  }
+  try {
+    const writer = port.writable.getWriter();
+    await writer.write(enc.encode(cmd + '\n'));
+    writer.releaseLock();
+    log('» ' + cmd);
+  } catch (e) {
+    log('发送失败: ' + e.message, '#ff4d6d');
+  }
+}
+
+/* ---- 断开 ---- */
+async function disconnect() {
+  keepReading = false;
+  if (reader) { try { await reader.cancel(); } catch (_) {} }
+  if (port) {
+    try { await port.close(); } catch (_) {}
+    port = null;
+  }
+  setConnected(false);
+  portInfo.textContent = '';
+  log('已断开', '#ff4d6d');
+}
+
+/* ===== 事件绑定 ===== */
+connectBtn.onclick = connect;
+disconnectBtn.onclick = disconnect;
+
+/* data-cmd 按钮 */
+document.querySelectorAll('[data-cmd]').forEach(b => {
+  b.onclick = () => send(b.dataset.cmd);
+});
+
+$('danceBtn').onclick = () => send('d');
+$('clearBtn').onclick = () => { term.innerHTML = ''; lineCount = 0; echoCount.textContent = '0'; };
+
+/* 自定义命令输入 */
+$('sendCmdBtn').onclick = () => {
+  const v = cmdInput.value.trim();
+  if (v) { send(v); cmdInput.value = ''; }
+};
+cmdInput.onkeydown = e => {
+  if (e.key === 'Enter') {
+    const v = cmdInput.value.trim();
+    if (v) { send(v); cmdInput.value = ''; }
+    e.preventDefault();
+  }
+};
+
+/* 速度滑条 */
+speed.oninput = () => {
+  speedVal.textContent = speed.value + 'µs';
+};
+speed.onchange = () => {
+  send('v' + speed.value);
+};
+
+/* ===== 键盘快捷键 ===== */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;  // 输入框内不处理
+
+  switch (e.key) {
+    case 'ArrowUp':    e.preventDefault(); send(lastSel === 'p' ? 't r5' : 'p r5');  break;
+    case 'ArrowDown':  e.preventDefault(); send(lastSel === 'p' ? 't r-5' : 'p r-5'); break;
+    case 'ArrowLeft':  e.preventDefault(); send(lastSel === 'p' ? 'p a' : 't a');    break;
+    case 'ArrowRight': e.preventDefault(); send(lastSel === 'p' ? 'p c' : 't c');    break;
+    case ' ':
+      e.preventDefault(); send('s');
+      // 闪一下停止按钮
+      const sBtn = document.querySelector('[data-cmd="s"]');
+      if (sBtn) { sBtn.style.background = 'rgba(255,77,109,0.3)';
+        setTimeout(() => sBtn.style.background = '', 150); }
+      break;
+    case 'p': setActiveAxis('p'); send('p'); break;
+    case 't': setActiveAxis('t'); send('t'); break;
+    case '?': send('?'); break;
+    case 'd': send('d'); break;
+  }
+  // 数字键 1-9 → 设置速度
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 9) {
+    const v = 10000 - (n - 1) * 1000;  // 1=10000µs(慢), 9=2000µs(快)
+    const clamped = Math.max(1300, Math.min(10000, v));
+    speed.value = clamped;
+    speedVal.textContent = clamped + 'µs';
+    send('v' + clamped);
+  }
+});
+
+/* 方向键同时支持 WASD */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  switch (e.key.toLowerCase()) {
+    case 'w': e.preventDefault(); send(lastSel === 'p' ? 't r5' : 'p r5');  break;
+    case 's': e.preventDefault(); send(lastSel === 'p' ? 't r-5' : 'p r-5'); break;
+    case 'a': e.preventDefault(); send(lastSel === 'p' ? 'p a' : 't a');    break;
+    case 'd': e.preventDefault(); send(lastSel === 'p' ? 'p c' : 't c');    break;
+  }
+});
+
+/* 浏览器兼容性检查 */
+if (!('serial' in navigator)) {
+  log('⚠️ 当前浏览器不支持 Web Serial API', '#ff4d6d');
+  log('请用电脑版 Chrome / Edge', '#ff4d6d');
+  connectBtn.disabled = true;
+}
+</script>
+</body>
+</html>
